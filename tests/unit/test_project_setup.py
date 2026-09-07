@@ -1,4 +1,7 @@
-"""Smoke tests for project setup."""
+"""Tests for project setup."""
+
+import tempfile
+from pathlib import Path
 
 from documentops.api.main import app
 from documentops.config.settings import Settings, settings
@@ -19,6 +22,20 @@ def test_custom_settings_override() -> None:
     """Custom settings should override defaults."""
     custom = Settings(api_port=9000, worker_concurrency=1)
     assert custom.api_port == 9000
+
+
+def test_settings_loads_from_env_file() -> None:
+    """Settings should load values from a .env file."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        env_file = Path(tmpdir) / ".env"
+        env_file.write_text(
+            "API_PORT=7777\nLOG_LEVEL=DEBUG\nMAX_FILE_SIZE_BYTES=1048576\n",
+            encoding="utf-8",
+        )
+        custom_settings = Settings(_env_file=env_file)
+        assert custom_settings.api_port == 7777
+        assert custom_settings.log_level == "DEBUG"
+        assert custom_settings.max_file_size_bytes == 1_048_576
 
 
 def test_base_metadata_exists() -> None:
