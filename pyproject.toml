@@ -1,21 +1,23 @@
-[tool.poetry]
+[project]
 name = "documentops"
 version = "0.1.0"
 description = "Sistema de automatización documental"
-authors = ["DocumentOps Team"]
+authors = [{name = "DocumentOps Team"}]
 readme = "README.md"
-packages = [{include = "documentops", from = "src"}]
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "fastapi (>=0.115.0,<0.116.0)",
+    "pydantic (>=2.9.0,<3.0.0)",
+    "pydantic-settings (>=2.5.0,<3.0.0)",
+    "sqlalchemy (>=2.0.35,<3.0.0)",
+    "psycopg2-binary (>=2.9.9,<3.0.0)",
+    "alembic (>=1.13.3,<2.0.0)",
+    "pymupdf (>=1.24.10,<2.0.0)",
+    "uvicorn[standard] (>=0.30.0,<0.31.0)",
+]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-fastapi = "^0.115.0"
-pydantic = "^2.9.0"
-pydantic-settings = "^2.5.0"
-sqlalchemy = "^2.0.35"
-psycopg2-binary = "^2.9.9"
-alembic = "^1.13.3"
-pymupdf = "^1.24.10"
-uvicorn = {extras = ["standard"], version = "^0.30.0"}
+[tool.poetry]
+packages = [{include = "documentops", from = "src"}]
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
