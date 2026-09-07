@@ -18,7 +18,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      target: api
     environment:
       DATABASE_URL: postgresql://documentops:documentops@postgres:5432/documentops
       API_HOST: 0.0.0.0
@@ -46,7 +46,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: Dockerfile.worker
+      target: worker
     environment:
       DATABASE_URL: postgresql://documentops:documentops@postgres:5432/documentops
       WORKER_ID: worker-1
