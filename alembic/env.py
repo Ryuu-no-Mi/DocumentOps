@@ -9,8 +9,12 @@ from documentops.config.settings import settings
 from documentops.infrastructure.db.base import Base
 
 # Import all models so Alembic can discover them
-# These will be added in subsequent features
-# from documentops.infrastructure.db.models import document  # noqa: F401
+from documentops.infrastructure.db.models import (  # noqa: F401
+    Document,
+    ExtractedData,
+    ProcessingAttempt,
+    StateTransition,
+)
 
 config = context.config
 
