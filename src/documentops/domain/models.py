@@ -3,6 +3,7 @@
 import uuid
 from datetime import datetime
 from enum import Enum
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -180,3 +181,16 @@ class StateTransitionSummary(BaseModel):
     reason: str | None = None
     created_by: str
     created_at: datetime
+
+
+class DocumentIngestionRequest(BaseModel):
+    """Request produced by a DocumentSource to ingest a new document."""
+
+    source_type: str = Field(description="Type of source (local_folder, email, etc.)")
+    source_id: str = Field(description="Identifier of the source instance")
+    original_filename: str = Field(description="Original filename as detected")
+    file_path: Path = Field(description="Absolute path to the detected file")
+    file_size: int = Field(gt=0, description="File size in bytes")
+    mime_type: str = Field(description="MIME type of the file")
+    received_at: datetime = Field(description="When the document was detected")
+    metadata: dict = Field(default_factory=dict, description="Additional source metadata")
