@@ -1,7 +1,6 @@
 """Worker entrypoint."""
 
 import logging
-import time
 
 from documentops.config.settings import settings
 
@@ -15,17 +14,14 @@ logger = logging.getLogger(__name__)
 
 def run_worker() -> None:
     """Run the document processing worker."""
-    logger.info("Starting DocumentOps worker (id=%s)", settings.worker_id)
-    logger.info("Worker concurrency: %d", settings.worker_concurrency)
-    logger.info("Poll interval: %d seconds", settings.poll_interval_seconds)
+    from documentops.infrastructure.storage.file_storage import ensure_storage_directories
 
-    try:
-        while True:
-            logger.debug("Worker polling cycle")
-            # Source polling and processing polling will be implemented here.
-            time.sleep(settings.poll_interval_seconds)
-    except KeyboardInterrupt:
-        logger.info("Worker stopped by user")
+    ensure_storage_directories()
+
+    from documentops.worker.service import WorkerService
+
+    service = WorkerService()
+    service.run()
 
 
 if __name__ == "__main__":
