@@ -110,6 +110,14 @@ class TestProcessingPipeline:
 
         assert result.extracted_data is not None
         assert result.extracted_data.document_type == DocumentType.UNKNOWN.value
+        assert result.status == DocumentStatus.NEEDS_REVIEW.value
+
+        states = [t.to_state for t in result.state_transitions]
+        assert DocumentStatus.CLASSIFIED.value in states
+        assert DocumentStatus.ORGANIZED.value in states
+        assert DocumentStatus.NEEDS_REVIEW.value in states
+        assert DocumentStatus.DATA_EXTRACTED.value not in states
+        assert DocumentStatus.VALIDATED.value not in states
 
     def test_process_creates_state_transitions(self, db_session, tmp_path) -> None:
         """Test that processing creates proper state transitions."""
@@ -126,7 +134,10 @@ class TestProcessingPipeline:
 
     def test_process_creates_processing_attempts(self, db_session, tmp_path) -> None:
         """Test that processing creates processing attempts for each step."""
-        pdf_path = _create_test_pdf(tmp_path, "Factura Endesa 12345")
+        pdf_path = _create_test_pdf(
+            tmp_path,
+            "ENDESA ENERGÍA\nFactura nº 2026/92837\nFecha: 01/09/2026\nTotal: 84,32 EUR\nIVA 21%"
+        )
         doc = _create_document(db_session, str(pdf_path))
 
         processor = DocumentProcessor(db_session)
@@ -136,6 +147,8 @@ class TestProcessingPipeline:
         assert "extract" in steps
         assert "classify" in steps
         assert "structure" in steps
+        assert "validate" in steps
+        assert "organize" in steps
 
     def test_process_handles_corrupt_pdf(self, db_session, tmp_path) -> None:
         """Test that corrupt PDF results in FAILED state."""
