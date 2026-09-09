@@ -3,13 +3,18 @@
 import logging
 import shutil
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from documentops.config.settings import settings
 from documentops.domain.models import DocumentType
 from documentops.infrastructure.storage.file_storage import sanitize_filename
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_path(path: Path) -> str:
+    """Convert a Path to a POSIX-style string with forward slashes."""
+    return str(PurePosixPath(path.as_posix()))
 
 
 class FileOrganizer:
@@ -22,10 +27,10 @@ class FileOrganizer:
         date: str | None,
         invoice_number: str | None,
         hash_short: str,
-    ) -> Path:
+    ) -> str:
         """Move file to processed directory.
 
-        Returns the new file path.
+        Returns the normalized file path with forward slashes.
         """
         now = datetime.now()
         year = date[:4] if date and len(date) >= 4 else str(now.year)
@@ -44,18 +49,19 @@ class FileOrganizer:
         destination = dest_dir / filename
 
         shutil.move(str(source_path), str(destination))
-        logger.info("File organized to: %s", destination)
+        normalized = _normalize_path(destination)
+        logger.info("File organized to: %s", normalized)
 
-        return destination
+        return normalized
 
     def organize_to_failed(
         self,
         source_path: Path,
         hash_short: str,
-    ) -> Path:
+    ) -> str:
         """Move file to failed directory.
 
-        Returns the new file path.
+        Returns the normalized file path with forward slashes.
         """
         now = datetime.now()
         year = str(now.year)
@@ -69,19 +75,20 @@ class FileOrganizer:
         destination = dest_dir / filename
 
         shutil.move(str(source_path), str(destination))
-        logger.info("File moved to failed: %s", destination)
+        normalized = _normalize_path(destination)
+        logger.info("File moved to failed: %s", normalized)
 
-        return destination
+        return normalized
 
     def organize_to_review(
         self,
         source_path: Path,
         document_type: DocumentType,
         hash_short: str,
-    ) -> Path:
+    ) -> str:
         """Move file to review directory.
 
-        Returns the new file path.
+        Returns the normalized file path with forward slashes.
         """
         now = datetime.now()
         year = str(now.year)
@@ -100,6 +107,7 @@ class FileOrganizer:
         destination = dest_dir / filename
 
         shutil.move(str(source_path), str(destination))
-        logger.info("File organized to review: %s", destination)
+        normalized = _normalize_path(destination)
+        logger.info("File organized to review: %s", normalized)
 
-        return destination
+        return normalized

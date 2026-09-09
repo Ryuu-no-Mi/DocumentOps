@@ -23,11 +23,12 @@ class TestFileOrganizer:
                 result = organizer.organize_to_processed(
                     source, DocumentType.INVOICE, "2026-09-01", "2026/92837", "abc12345"
                 )
-                assert result.exists()
-                assert "processed" in str(result)
-                assert "invoice" in str(result)
-                assert "2026" in str(result)
-                assert "abc12345" in result.name
+                result_path = Path(result)
+                assert result_path.exists()
+                assert "processed" in result
+                assert "invoice" in result
+                assert "2026" in result
+                assert "abc12345" in result_path.name
 
     def test_organize_unknown_to_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -41,9 +42,10 @@ class TestFileOrganizer:
                 result = organizer.organize_to_processed(
                     source, DocumentType.UNKNOWN, None, None, "abc12345"
                 )
-                assert result.exists()
-                assert "review" in str(result)
-                assert "unknown" in str(result)
+                result_path = Path(result)
+                assert result_path.exists()
+                assert "review" in result
+                assert "unknown" in result
 
     def test_organize_to_failed(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -55,9 +57,10 @@ class TestFileOrganizer:
 
                 organizer = FileOrganizer()
                 result = organizer.organize_to_failed(source, "abc12345")
-                assert result.exists()
-                assert "failed" in str(result)
-                assert "abc12345" in result.name
+                result_path = Path(result)
+                assert result_path.exists()
+                assert "failed" in result
+                assert "abc12345" in result_path.name
 
     def test_organize_to_review(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -69,9 +72,10 @@ class TestFileOrganizer:
 
                 organizer = FileOrganizer()
                 result = organizer.organize_to_review(source, DocumentType.INVOICE, "abc12345")
-                assert result.exists()
-                assert "review" in str(result)
-                assert "invoice" in str(result)
+                result_path = Path(result)
+                assert result_path.exists()
+                assert "review" in result
+                assert "invoice" in result
 
     def test_source_file_removed_after_move(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -86,3 +90,18 @@ class TestFileOrganizer:
                     source, DocumentType.INVOICE, "2026-09-01", "001", "abc12345"
                 )
                 assert not source.exists()
+
+    def test_paths_use_forward_slashes(self) -> None:
+        """Verify that returned paths always use forward slashes."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            source = Path(tmpdir) / "source.pdf"
+            source.write_bytes(b"%PDF-1.4 content")
+
+            with patch("documentops.processing.organizer.settings") as mock_s:
+                mock_s.processed_dir = str(Path(tmpdir) / "processed")
+
+                organizer = FileOrganizer()
+                result = organizer.organize_to_processed(
+                    source, DocumentType.INVOICE, "2026-09-01", "2026/92837", "abc12345"
+                )
+                assert "\\" not in result
