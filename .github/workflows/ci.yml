@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: documentops
+          POSTGRES_PASSWORD: documentops
+          POSTGRES_DB: documentops
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Poetry
+        run: pipx install poetry
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: poetry
+
+      - name: Install dependencies
+        run: poetry install
+
+      - name: Run linting
+        run: poetry run ruff check src/ tests/
+
+      - name: Run formatting check
+        run: poetry run ruff format --check src/ tests/
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://documentops:documentops@localhost:5432/documentops
+        run: poetry run pytest -v
+
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker images
+        run: docker compose build
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Wait for services
+        run: sleep 15
+
+      - name: Verify API health
+        run: curl -f http://localhost:8000/health
+
+      - name: Verify worker is running
+        run: docker compose ps worker | grep -q "Up"
+
+      - name: Cleanup
+        run: docker compose down -v

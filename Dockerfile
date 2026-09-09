@@ -27,6 +27,9 @@ RUN poetry install --without dev --no-root && rm -rf $POETRY_CACHE_DIR
 COPY . .
 RUN poetry install --without dev
 
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
+
 
 # -----------------------------------------------------------------------------
 # API stage: exposes FastAPI application
@@ -39,8 +42,9 @@ CMD ["poetry", "run", "uvicorn", "documentops.api.main:app", "--host", "0.0.0.0"
 
 
 # -----------------------------------------------------------------------------
-# Worker stage: runs document processing worker
+# Worker stage: runs document processing worker (with auto-migration)
 # -----------------------------------------------------------------------------
 FROM base AS worker
 
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["poetry", "run", "python", "-m", "documentops.worker.main"]
