@@ -114,6 +114,7 @@ class DocumentProcessor:
             logger.error("Processing error: %s (step=%s, type=%s)", e, e.step, e.error_type)
             self._record_failed_attempt(document, attempt_number, e.step, e.error_type, str(e))
             self._transition(document, DocumentStatus.FAILED, str(e))
+            self._finalize_document(document)
             self.db.refresh(document)
             return document
 
@@ -123,6 +124,7 @@ class DocumentProcessor:
                 document, attempt_number, "unknown", ErrorType.PERMANENT, str(e)
             )
             self._transition(document, DocumentStatus.FAILED, str(e))
+            self._finalize_document(document)
             self.db.refresh(document)
             return document
 
@@ -146,6 +148,7 @@ class DocumentProcessor:
             self._finish_attempt(document, len(document.processing_attempts), "organize")
             self._transition(document, DocumentStatus.ORGANIZED, "Organized to review")
             self._transition(document, DocumentStatus.NEEDS_REVIEW, "Validation failed")
+            self._finalize_document(document)
         elif doc_type == DocumentType.UNKNOWN:
             new_path = self.organizer.organize_to_review(
                 Path(document.raw_path), doc_type, hash_short
@@ -154,6 +157,7 @@ class DocumentProcessor:
             self._finish_attempt(document, len(document.processing_attempts), "organize")
             self._transition(document, DocumentStatus.ORGANIZED, "Organized to review")
             self._transition(document, DocumentStatus.NEEDS_REVIEW, "Unknown document type")
+            self._finalize_document(document)
         else:
             new_path = self.organizer.organize_to_processed(
                 Path(document.raw_path),
@@ -166,6 +170,15 @@ class DocumentProcessor:
             self._finish_attempt(document, len(document.processing_attempts), "organize")
             self._transition(document, DocumentStatus.ORGANIZED, "Organized to processed")
             self._transition(document, DocumentStatus.COMPLETED, "Processing complete")
+            self._finalize_document(document)
+
+    def _finalize_document(self, document: Document) -> None:
+        """Set processed_at and clear lease fields for terminal states."""
+        document.processed_at = datetime.now(timezone.utc)
+        document.processing_started_at = None
+        document.processing_lease_expires_at = None
+        document.processed_by = None
+        self.db.flush()
 
     def _transition(self, document: Document, new_status: DocumentStatus, reason: str) -> None:
         """Record a state transition and update document status."""

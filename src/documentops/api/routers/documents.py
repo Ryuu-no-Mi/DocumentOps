@@ -193,38 +193,18 @@ def reprocess_document(
     db: Session = Depends(get_db),
 ) -> ReprocessResponse:
     """Reprocess a document by resetting its state to DETECTED."""
-    document = db.get(Document, document_id)
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
+    from documentops.application.services.reprocess import ReprocessService
 
-    if document.status not in [
-        DocumentStatus.COMPLETED.value,
-        DocumentStatus.FAILED.value,
-        DocumentStatus.NEEDS_REVIEW.value,
-    ]:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Cannot reprocess document in state {document.status}",
-        )
-
-    old_status = document.status
-    document.status = DocumentStatus.DETECTED.value
-    document.processing_started_at = None
-    document.processing_lease_expires_at = None
-    document.processed_by = None
-
-    transition = StateTransition(
-        document_id=document.id,
-        from_state=old_status,
-        to_state=DocumentStatus.DETECTED.value,
-        reason="Manual reprocess via API",
-        created_by="api",
-    )
-    db.add(transition)
-    db.commit()
+    service = ReprocessService(db)
+    try:
+        document = service.reprocess(document_id)
+    except ValueError as e:
+        if "not found" in str(e):
+            raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=409, detail=str(e))
 
     return ReprocessResponse(
         document_id=document.id,
         status=document.status,
-        message=f"Document queued for reprocessing (was {old_status})",
+        message=f"Document queued for reprocessing",
     )
