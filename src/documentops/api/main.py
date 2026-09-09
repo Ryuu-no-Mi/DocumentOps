@@ -4,6 +4,7 @@ import logging
 
 from fastapi import FastAPI
 
+from documentops.api.routers.documents import router as documents_router
 from documentops.config.settings import settings
 
 logging.basicConfig(
@@ -16,6 +17,8 @@ app = FastAPI(
     description="Sistema de automatización documental",
     version="0.1.0",
 )
+
+app.include_router(documents_router)
 
 
 @app.get("/health", tags=["health"])
