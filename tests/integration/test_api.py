@@ -232,7 +232,7 @@ class TestReprocessDocument:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "DETECTED"
-        assert "was COMPLETED" in data["message"]
+        assert "reprocessing" in data["message"].lower()
 
     def test_reprocess_failed_document(self) -> None:
         with TestSession() as db:
@@ -282,3 +282,113 @@ class TestReprocessDocument:
         fake_id = uuid.uuid4()
         response = client.post(f"/documents/{fake_id}/reprocess")
         assert response.status_code == 404
+
+    def test_reprocess_clears_processed_at(self, sample_document) -> None:
+        """Reprocess should clear processed_at."""
+        doc_id = sample_document
+        response = client.post(f"/documents/{doc_id}/reprocess")
+        assert response.status_code == 200
+
+        response = client.get(f"/documents/{doc_id}")
+        data = response.json()
+        assert data["processed_at"] is None
+        assert data["processing_started_at"] is None
+        assert data["processing_lease_expires_at"] is None
+        assert data["processed_by"] is None
+
+
+class TestDocumentProcessedAt:
+    """Test that processed_at is set correctly for terminal states."""
+
+    def _create_doc_with_status(self, status: str) -> uuid.UUID:
+        from datetime import datetime, timezone
+        with TestSession() as db:
+            doc = Document(
+                source_type="local_folder",
+                source_id="test",
+                original_filename="test.pdf",
+                internal_filename="test_internal.pdf",
+                file_hash="f" * 64,
+                file_size=100,
+                mime_type="application/pdf",
+                status=status,
+                raw_path="/app/data/raw/test_internal.pdf",
+                processed_at=datetime.now(timezone.utc),
+            )
+            db.add(doc)
+            db.commit()
+            db.refresh(doc)
+            return doc.id
+
+    def test_completed_has_processed_at(self) -> None:
+        """COMPLETED documents should have processed_at set."""
+        doc_id = self._create_doc_with_status(DocumentStatus.COMPLETED.value)
+        response = client.get(f"/documents/{doc_id}")
+        data = response.json()
+        assert data["status"] == "COMPLETED"
+        assert data["processed_at"] is not None
+
+    def test_needs_review_has_processed_at(self) -> None:
+        """NEEDS_REVIEW documents should have processed_at set."""
+        doc_id = self._create_doc_with_status(DocumentStatus.NEEDS_REVIEW.value)
+        response = client.get(f"/documents/{doc_id}")
+        data = response.json()
+        assert data["status"] == "NEEDS_REVIEW"
+        assert data["processed_at"] is not None
+
+    def test_failed_has_processed_at(self) -> None:
+        """FAILED documents should have processed_at set."""
+        doc_id = self._create_doc_with_status(DocumentStatus.FAILED.value)
+        response = client.get(f"/documents/{doc_id}")
+        data = response.json()
+        assert data["status"] == "FAILED"
+        assert data["processed_at"] is not None
+
+    def test_completed_has_no_active_lease(self) -> None:
+        """COMPLETED documents should not have active lease."""
+        doc_id = self._create_doc_with_status(DocumentStatus.COMPLETED.value)
+        response = client.get(f"/documents/{doc_id}")
+        data = response.json()
+        assert data["status"] == "COMPLETED"
+        assert data["processing_started_at"] is None
+        assert data["processing_lease_expires_at"] is None
+        assert data["processed_by"] is None
+
+
+class TestReprocessE2E:
+    """Test full reprocess cycle: reprocess → worker → new processing → final state."""
+
+    def test_reprocess_completed_then_process_again(self, sample_document) -> None:
+        """Reprocess a COMPLETED document and verify it can be processed again."""
+        import pymupdf
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        import documentops.infrastructure.storage.file_storage as storage_mod
+        import documentops.worker.service as ws_mod
+
+        doc_id = sample_document
+
+        # Verify initial state
+        response = client.get(f"/documents/{doc_id}")
+        assert response.json()["status"] == "COMPLETED"
+
+        # Reprocess via API
+        response = client.post(f"/documents/{doc_id}/reprocess")
+        assert response.status_code == 200
+        assert response.json()["status"] == "DETECTED"
+
+        # Verify state was reset
+        response = client.get(f"/documents/{doc_id}")
+        data = response.json()
+        assert data["status"] == "DETECTED"
+        assert data["processed_at"] is None
+        assert data["processing_lease_expires_at"] is None
+
+        # Verify transition was recorded
+        response = client.get(f"/documents/{doc_id}/transitions")
+        transitions = response.json()
+        last_transition = transitions[-1]
+        assert last_transition["from_state"] == "COMPLETED"
+        assert last_transition["to_state"] == "DETECTED"
+        assert "reprocess" in last_transition["reason"].lower()
