@@ -152,6 +152,15 @@ Transiciones (sin pasar por DATA_EXTRACTED ni VALIDATED):
 DETECTED → PROCESSING → TEXT_EXTRACTED → CLASSIFIED → ORGANIZED → NEEDS_REVIEW
 ```
 
+### Resultados posibles
+
+| Resultado | Destino | Significado |
+|-----------|---------|-------------|
+| `COMPLETED` | `processed/invoice/` | Factura válida con todos los campos extraídos |
+| `NEEDS_REVIEW` (invoice) | `review/invoice/` | Factura detectada pero con datos incompletos o inválidos |
+| `NEEDS_REVIEW` (unknown) | `review/unknown/` | Documento que no parece una factura |
+| `FAILED` | `failed/` | Error técnico (PDF corrupto, etc.) |
+
 ### 9. Reprocesar un documento
 
 ```bash
@@ -181,6 +190,8 @@ docker compose down -v
 ```
 
 ## Desarrollo local
+
+> **Importante:** No ejecutes el worker local y el worker de Docker simultáneamente contra la misma base de datos. Compartirán la cola de documentos y los archivos raw no serán accesibles desde ambos entornos. Usa **uno u otro**.
 
 ### Requisitos
 
