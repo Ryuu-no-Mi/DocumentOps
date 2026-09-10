@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from documentops.domain.models import (
@@ -63,12 +64,18 @@ class DocumentProcessor:
             extracted_text = self.text_extractor.extract(document.raw_path)
             self._finish_attempt(document, attempt_number, "extract")
 
-            extracted_data = ExtractedData(
-                document_id=document.id,
-                document_type=DocumentType.UNKNOWN.value,
-                extracted_text=extracted_text,
+            extracted_data = self.db.scalar(
+                select(ExtractedData).where(ExtractedData.document_id == document.id)
             )
-            self.db.add(extracted_data)
+            if extracted_data is None:
+                extracted_data = ExtractedData(document_id=document.id)
+                self.db.add(extracted_data)
+
+            extracted_data.document_type = DocumentType.UNKNOWN.value
+            extracted_data.confidence = 0.0
+            extracted_data.extracted_text = extracted_text
+            extracted_data.extracted_fields = None
+            extracted_data.validation_errors = None
             self._transition(document, DocumentStatus.TEXT_EXTRACTED, "Text extracted")
 
             self._record_attempt(document, attempt_number, "classify")

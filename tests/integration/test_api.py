@@ -51,7 +51,11 @@ def clean_db():
 
 
 @pytest.fixture
-def sample_document():
+def sample_document(tmp_path):
+    processed_path = tmp_path / "processed" / "invoice.pdf"
+    processed_path.parent.mkdir(parents=True)
+    processed_path.write_bytes(b"test document")
+
     doc = Document(
         source_type="local_folder",
         source_id="test",
@@ -61,8 +65,8 @@ def sample_document():
         file_size=1024,
         mime_type="application/pdf",
         status=DocumentStatus.COMPLETED.value,
-        raw_path="/app/data/raw/invoice_internal.pdf",
-        processed_path="/app/data/processed/invoice/2026/09/invoice.pdf",
+        raw_path=str(tmp_path / "raw" / "invoice_internal.pdf"),
+        processed_path=str(processed_path),
     )
     with TestSession() as db:
         db.add(doc)
@@ -234,7 +238,11 @@ class TestReprocessDocument:
         assert data["status"] == "DETECTED"
         assert "reprocessing" in data["message"].lower()
 
-    def test_reprocess_failed_document(self) -> None:
+    def test_reprocess_failed_document(self, tmp_path) -> None:
+        raw_path = tmp_path / "raw" / "failed_internal.pdf"
+        raw_path.parent.mkdir(parents=True)
+        raw_path.write_bytes(b"failed document")
+
         with TestSession() as db:
             doc = Document(
                 source_type="local_folder",
@@ -245,7 +253,7 @@ class TestReprocessDocument:
                 file_size=100,
                 mime_type="application/pdf",
                 status=DocumentStatus.FAILED.value,
-                raw_path="/app/data/raw/failed_internal.pdf",
+                raw_path=str(raw_path),
             )
             db.add(doc)
             db.commit()
