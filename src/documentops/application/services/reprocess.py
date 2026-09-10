@@ -1,7 +1,9 @@
 """Document reprocess service."""
 
 import logging
+import shutil
 import uuid
+from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -40,9 +42,11 @@ class ReprocessService:
                 f"Must be one of: {', '.join(REPROCESSABLE_STATES)}"
             )
 
+        self._restore_source_file(document)
         old_status = document.status
         document.status = DocumentStatus.DETECTED.value
         document.processed_at = None
+        document.processed_path = None
         document.processing_started_at = None
         document.processing_lease_expires_at = None
         document.processed_by = None
@@ -59,3 +63,19 @@ class ReprocessService:
 
         logger.info("Document %s queued for reprocessing (was %s)", document.id, old_status)
         return document
+
+    def _restore_source_file(self, document: Document) -> None:
+        """Restore an organized file to raw storage before reprocessing."""
+        raw_path = Path(document.raw_path)
+        if raw_path.exists():
+            return
+
+        if not document.processed_path:
+            raise ValueError("Document has no available source file for reprocessing")
+
+        processed_path = Path(document.processed_path)
+        if not processed_path.exists():
+            raise ValueError("Document source file is no longer available for reprocessing")
+
+        raw_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(processed_path), str(raw_path))
